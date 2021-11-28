@@ -19,6 +19,8 @@ class COCO:
                 'person_keypoints': None
             }
         }
+        self.categories = None
+        self.superCategories = None
             
     def loadAnnotationFile(self, typeData = "train", typeAnnotation="instances"):
         
@@ -77,7 +79,7 @@ class COCO:
             # Maybe change the result in a form usefull for a model. Like create a target key.
             yield result
     
-    def getImageByFileName(self, fileName):
+    def getImageByFileName(self, fileName = '391895.jpg'):
         
         # fileName always have the format 000000000016.jpg
         fileName = (fileName.split('.')[0] + ".jpg").zfill(16)
@@ -97,20 +99,34 @@ class COCO:
         print("Warning: Image not found")
         return None
     
-    def getImageById(self, id, typeData):
+    def getImageById(self, id = 391895, typeData = 'train'):
         
         annotations = self.loadAnnotationFile(typeData = typeData, typeAnnotation = "instances")
 
+        imageData = None
         for image in annotations['images']:
             if image['id'] == id:
-                imageData = image
+                imageData = image.copy()
                 break
         
+        if imageData == None:
+            raise ValueError(f'id not found in {typeData} dataset')
+
         # Fill imageData with every existing instances
         imageData['instances'] = []
         for instance in annotations['annotations']:
             if instance['image_id'] == id:
-                imageData['instances'].append(instance)
+                imageData['instances'].append(instance.copy())
+
+                # Add category to each element on the picture
+                for category in annotations['categories']:
+                    if  imageData['instances'][-1]['category_id'] == category['id']:
+                        imageData['instances'][-1]['category'] = category
+        
+        captions = self.loadAnnotationFile(typeData=typeData, typeAnnotation='captions')
+        for caption in captions['annotations']:
+            if caption['image_id'] == imageData['id']:
+                imageData['caption'] = caption
         
         # Add image to imageData
         im = Image.imread(self.rootPath + f"/images/{typeData}2017/" + imageData['file_name'])
@@ -118,28 +134,81 @@ class COCO:
 
         return imageData
 
-    def showImageInstances(self, imageData, minArea = 2000):
+    def showImageInstancesSegmentation(self, imageData, index = None, minArea = 2000, figsize = (12,12)):
 
-        plt.figure(figsize =(12,12))
+        plt.figure(figsize = figsize)
 
-        instance = imageData['instances'][0]
-        print(instance)
-        for instance in imageData['instances']:
-            
-            if instance['area'] > minArea:
-                x = instance['segmentation'][0][::2]
-                y = instance['segmentation'][0][1::2]
-
-                x.append(x[0])
-                y.append(y[0])
-                plt.plot(x,y)
-
-                # Print the box around the object
-                """ origin = (instance['bbox'][0], instance['bbox'][1])
-                width = instance['bbox'][2]
-                height = instance['bbox'][3]
-                xR = [origin[0], origin[0], origin[0] + width, origin[0] + width, origin[0]]
-                yR = [origin[1], origin[1] + height, origin[1] + height, origin[1], origin[1]]
-                plt.plot(xR,yR) """
+        if index != None:
+            self.showSegmentation(imageData['instances'][index])
+        else:
+            for instance in imageData['instances']:
+                if instance['area'] > minArea:
+                    self.showSegmentation(instance)
             
         plt.imshow(imageData['image'])
+        plt.legend()
+        plt.title(imageData['caption']['caption'])
+
+    def showSegmentation(self, instance):
+        x = instance['segmentation'][0][::2]
+        y = instance['segmentation'][0][1::2]
+
+        x.append(x[0])
+        y.append(y[0])
+        if ("category" in instance):
+            plt.plot(x,y, label = instance['category']['name'])
+        else:
+            plt.plot(x,y)
+    
+
+    def showImageInstancesBbox(self, imageData, index = None, minArea = 2000, figsize = (12,12)):
+        plt.figure(figsize = figsize)
+
+        if index != None:
+            instance = imageData['instances'][index]
+            self.showBbox(instance)
+        else:
+            for instance in imageData['instances']:
+                if instance['area'] > minArea:
+                    self.showBbox(instance)
+            
+        plt.imshow(imageData['image'])
+        plt.legend()
+        plt.title(imageData['caption']['caption'])
+
+    def showBbox(self, instance):
+        # Print the box around the object
+        origin = (instance['bbox'][0], instance['bbox'][1])
+        width = instance['bbox'][2]
+        height = instance['bbox'][3]
+
+        xR = [origin[0], origin[0], origin[0] + width, origin[0] + width, origin[0]]
+        yR = [origin[1], origin[1] + height, origin[1] + height, origin[1], origin[1]]
+
+        if ("category" in instance):
+            plt.plot(xR,yR, label = instance['category']['name'])
+        else:
+            plt.plot(xR,yR)
+
+    def getCategories(self):
+
+        if self.categories != None:
+            return self.categories
+        
+        annotations = self.loadAnnotationFile(typeData = 'train', typeAnnotation = "instances")
+
+        categories = [category['name'] for category in annotations['categories']]
+
+        self.categories = categories
+        return categories
+
+    def getSuperCategories(self):
+        if self.superCategories != None:
+            return self.categories
+        
+        annotations = self.loadAnnotationFile(typeData = 'train', typeAnnotation = "instances")
+
+        superCategories = list(set([category['supercategory'] for category in annotations['categories']]))
+
+        self.superCategories = superCategories
+        return superCategories
