@@ -134,35 +134,39 @@ class COCO:
 
         return imageData
 
-    def showImageInstancesSegmentation(self, imageData, index = None, minArea = 2000, figsize = (12,12)):
-
-        plt.figure(figsize = figsize)
+    def showImageInstancesSegmentation(self, imageData, index = None, minArea = 2000, ax = plt):
 
         if index != None:
             self.showSegmentation(imageData['instances'][index])
         else:
             for instance in imageData['instances']:
                 if instance['area'] > minArea:
-                    self.showSegmentation(instance)
+                    self.showSegmentation(instance, ax = ax)
             
-        plt.imshow(imageData['image'])
-        plt.legend()
-        plt.title(imageData['caption']['caption'])
+        ax.imshow(imageData['image'])
+        ax.legend()
+        #plt.title(imageData['caption']['caption'])
 
-    def showSegmentation(self, instance):
-        x = instance['segmentation'][0][::2]
-        y = instance['segmentation'][0][1::2]
+    def showSegmentation(self, instance, ax = plt):
 
-        x.append(x[0])
-        y.append(y[0])
-        if ("category" in instance):
-            plt.plot(x,y, label = instance['category']['name'])
+        if instance['iscrowd'] == 0:
+
+            for segmentation in instance['segmentation']:
+                x = segmentation[::2]
+                y = segmentation[1::2]
+
+                x.append(x[0])
+                y.append(y[0])
+                if ("category" in instance):
+                    ax.plot(x,y, label = instance['category']['name'])
+                else:
+                    ax.plot(x,y)
+        
         else:
-            plt.plot(x,y)
+            print("Need to handle crowd")
     
 
-    def showImageInstancesBbox(self, imageData, index = None, minArea = 2000, figsize = (12,12)):
-        plt.figure(figsize = figsize)
+    def showImageInstancesBbox(self, imageData, index = None, minArea = 2000, ax = plt):
 
         if index != None:
             instance = imageData['instances'][index]
@@ -170,13 +174,13 @@ class COCO:
         else:
             for instance in imageData['instances']:
                 if instance['area'] > minArea:
-                    self.showBbox(instance)
+                    self.showBbox(instance, ax = ax)
             
-        plt.imshow(imageData['image'])
-        plt.legend()
-        plt.title(imageData['caption']['caption'])
+        ax.imshow(imageData['image'])
+        ax.legend()
+        #ax.title(imageData['caption']['caption'])
 
-    def showBbox(self, instance):
+    def showBbox(self, instance, ax = plt):
         # Print the box around the object
         origin = (instance['bbox'][0], instance['bbox'][1])
         width = instance['bbox'][2]
@@ -186,9 +190,9 @@ class COCO:
         yR = [origin[1], origin[1] + height, origin[1] + height, origin[1], origin[1]]
 
         if ("category" in instance):
-            plt.plot(xR,yR, label = instance['category']['name'])
+            ax.plot(xR,yR, label = instance['category']['name'])
         else:
-            plt.plot(xR,yR)
+            ax.plot(xR,yR)
 
     def getCategories(self):
 
